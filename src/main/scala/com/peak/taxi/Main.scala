@@ -1,12 +1,12 @@
 package com.peak.taxi
 
+import org.apache.spark.sql.functions.{col, date_format, desc, lit}
 import org.apache.spark.sql.{DataFrame, SparkSession, functions}
-import org.apache.spark.sql.functions.{col, date_format, hour, lit, monotonically_increasing_id}
-
-import java.io.File
-import scala.reflect.internal.util.TableDef.Column
 
 object Main {
+
+  val trip_id = "trip_id"
+  val date_taxizone = "date_taxizone"
 
   def main(args: Array[String]): Unit = {
     val inputDirectory = args(0)
@@ -17,30 +17,34 @@ object Main {
 
     val spark = initSpark
 
-    val parquetFileDFDropOff = getDataFrame(spark, listOfFiles.head.toString,
+    val dropOffDataFrame = getDataFrame(spark, listOfFiles.head.toString,
       "dropoff_datetime", "dropoff_taxizone_id")
-    val parquetFileDFPickUp = getDataFrame(spark, listOfFiles.head.toString,
+    val pickUpDataFrame = getDataFrame(spark, listOfFiles.head.toString,
       "pickup_datetime", "pickup_taxizone_id")
 
-    println(parquetFileDFDropOff.columns.mkString("Array(", ", ", ")"))
+    val parquetFileDF = dropOffDataFrame
+      .union(pickUpDataFrame)
+      .filter(row => !row.anyNull)
+      .select(getConcatColumn, col(trip_id))
 
-    val parquetFileDF = parquetFileDFDropOff
-      .union(parquetFileDFPickUp)
-      .select(getConcatColumn, col("trip_id"))
+    parquetFileDF.groupBy(date_taxizone).count().orderBy(desc("count"))
 
+    spark.stop()
+  }
+
+  private def showParquetFile(parquetFileDF: DataFrame) = {
     println(parquetFileDF.columns.mkString("Array(", ", ", ")"))
 
     val header = parquetFileDF.take(10)
     println(header.mkString("Array(", ", ", ")"))
-
-    spark.stop()
   }
+
 
   private def getConcatColumn = {
     functions.concat(
       col("date"),
       lit(","),
-      col("taxizone_id")).as("date_taxizone")
+      col("taxizone_id")).as(date_taxizone)
   }
 
   def initSpark = {
@@ -53,7 +57,7 @@ object Main {
 
   private def getDataFrame(spark: SparkSession, file: String, dateTimeColumn: String, taxizoneColumn: String): DataFrame = {
     spark.read.parquet(file)
-      .select(dateTimeColumn, taxizoneColumn, "trip_id")
+      .select(dateTimeColumn, taxizoneColumn, trip_id)
       .withColumn(dateTimeColumn, date_format(col(dateTimeColumn), "yyyy-MM-dd HH"))
       .withColumnRenamed(dateTimeColumn, "date")
       .withColumnRenamed(taxizoneColumn, "taxizone_id")
