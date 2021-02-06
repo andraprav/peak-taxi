@@ -18,8 +18,6 @@ class Processor {
 
   /**
    *
-   * @param inputDirectory
-   * @param spark
    * @return a data frame containing 2 columns:
    *  date_taxizone -> separated by comma
    *  there are both pickups and dropoffs
@@ -30,7 +28,7 @@ class Processor {
       |2009-01-25 01,79|5263   |
       ............
    */
-  def getDataFrame(inputDirectory: String, spark: SparkSession) = {
+  def getTaxiTripsDataFrame(inputDirectory: String, spark: SparkSession) = {
 
     val taxiTrips = getTaxiTrips(inputDirectory, spark)
 

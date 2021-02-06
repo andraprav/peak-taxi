@@ -4,6 +4,17 @@ import com.peak.taxi.SparkUtils.initSpark
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.desc
 
+/**
+ * todo:
+ *  - decide how many cores to choose
+ *  - test with all files
+ *  - write result value in json file
+ *  - find way to get the parquet files back from processor.
+ *    idea 1:
+ *      - select all columns from files
+ *      - filter them by trip_id (the list in group by)
+ *      - write the results in a parquet file
+ */
 object Main {
 
   def main(args: Array[String]): Unit = {
@@ -14,9 +25,12 @@ object Main {
 
     val processor = new Processor();
 
-    val taxiTripsDf = processor.getDataFrame(inputDirectory, spark)
 
-    taxiTripsDf.groupBy(processor.date_taxizone).count().orderBy(desc("count"))//.show(false)
+    val taxiTripsDf = spark.time( processor.getTaxiTripsDataFrame(inputDirectory, spark))
+
+    spark.time({
+      println(taxiTripsDf.groupBy(processor.date_taxizone).count().orderBy(desc("count")).first())
+    })//.show(false)
 
     spark.stop()
   }
