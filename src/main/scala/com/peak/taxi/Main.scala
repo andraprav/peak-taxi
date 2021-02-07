@@ -2,7 +2,7 @@ package com.peak.taxi
 
 import com.google.gson.Gson
 import org.apache.spark.sql.functions.{count, desc}
-import org.apache.spark.sql.{DataFrame, Row}
+import org.apache.spark.sql.{DataFrame, Row, SaveMode}
 
 import java.io.PrintWriter
 
@@ -28,13 +28,15 @@ object Main {
   }
 
   private def getPeakHour(taxiTripsDf: DataFrame) = {
-    taxiTripsDf
-      .groupBy(Processor.date_taxizone)
-      .agg(count("trip_id") as "count")
-      .orderBy(desc("count"))
-      .first()
-      .get(0)
-      .toString
+    SparkInstance.spark.time({
+      taxiTripsDf
+        .groupBy(Processor.date_taxizone)
+        .agg(count("trip_id") as "count")
+        .orderBy(desc("count"))
+        .first()
+        .get(0)
+        .toString
+    })
   }
 
   private def writeJson(peakHourZoneId: String, outputDirectory: String) = {
@@ -59,7 +61,7 @@ object Main {
         .getTaxiTrips(inputDirectory)
         .filter(dropOffOrPickUpFilter(peakHour))
 
-      tripsInPeakHour.write.parquet(outputDirectory)
+      tripsInPeakHour.write.mode(SaveMode.Overwrite).parquet(outputDirectory + "/trips.parquet")
 
     })
   }
