@@ -3,15 +3,16 @@ package com.peak.taxi
 import org.apache.spark.sql.functions.{col, date_format, lit}
 import org.apache.spark.sql.{DataFrame, functions}
 
-class Processor {
-  val trip_id = "trip_id"
-  val date_taxizone = "date_taxizone"
-  val date = "date"
-  val taxizone_id = "taxizone_id"
+object Processor {
+  private val trip_id = "trip_id"
+  private val date = "date"
+  private val taxizone_id = "taxizone_id"
   private val pickup_datetime = "pickup_datetime"
   private val dropoff_datetime = "dropoff_datetime"
   private val pickup_taxizone_id = "pickup_taxizone_id"
   private val dropoff_taxizone_id = "dropoff_taxizone_id"
+
+  val date_taxizone = "date_taxizone"
 
   /**
    *

@@ -8,14 +8,8 @@ import java.io.PrintWriter
 
 /**
  * todo:
- *  - decide how many cores to choose
+ *  - decide how many cores to use
  *  - test with all files
- *    * write result value in json file
- *    * find way to get the parquet files back from processor.
- *    idea 1:
- *      - select all columns from files
- *      - filter them by trip_id (the list in group by)
- *      - write the results in a parquet file
  */
 object Main {
 
@@ -23,45 +17,45 @@ object Main {
     val inputDirectory = args(0)
     val outputDirectory = args(1)
 
+    val taxiTripsDf = Processor.getTaxiTripsDataFrame(inputDirectory)
 
-    val processor = new Processor();
+    val peakHourZoneId = getPeakHour(taxiTripsDf)
 
+    writeJson(peakHourZoneId, outputDirectory)
+    writeParquet(inputDirectory, outputDirectory, peakHourZoneId)
 
-    val taxiTripsDf = SparkInstance.spark.time(processor.getTaxiTripsDataFrame(inputDirectory))
+    SparkInstance.spark.stop()
+  }
 
-    val peakHourZoneId = taxiTripsDf
-      .groupBy(processor.date_taxizone)
+  private def getPeakHour(taxiTripsDf: DataFrame) = {
+    taxiTripsDf
+      .groupBy(Processor.date_taxizone)
       .agg(count("trip_id") as "count")
       .orderBy(desc("count"))
       .first()
       .get(0)
       .toString
-
-    writeJson(peakHourZoneId, outputDirectory)
-    writeParquet(inputDirectory, outputDirectory, processor, peakHourZoneId)
-
-    SparkInstance.spark.stop()
   }
 
   private def writeJson(peakHourZoneId: String, outputDirectory: String) = {
     new PrintWriter(outputDirectory + "/result.json") {
       private val details: Array[String] = peakHourZoneId.split(",")
-      val peakHour = details(0)
-      val zone = details(1)
+      val peakHour: String = details(0)
+      val zone: String = details(1)
 
       val peakHourJson = new PeakHour(peakHour, zone)
       val gson = new Gson
-      val jsonString = gson.toJson(peakHourJson)
+      val jsonString: String = gson.toJson(peakHourJson)
 
       write(jsonString)
       close()
     }
   }
 
-  private def writeParquet(inputDirectory: String, outputDirectory: String, processor: Processor, peakHour: String) = {
+  private def writeParquet(inputDirectory: String, outputDirectory: String, peakHour: String): Unit = {
     SparkInstance.spark.time({
 
-      val tripsInPeakHour = processor
+      val tripsInPeakHour = Processor
         .getTaxiTrips(inputDirectory)
         .filter(dropOffOrPickUpFilter(peakHour))
 
@@ -77,12 +71,5 @@ object Main {
 
       dropOff.equals(peakHour) || pickUp.equals(peakHour)
     }
-  }
-
-  private def showParquetFile(parquetFileDF: DataFrame) = {
-    println(parquetFileDF.columns.mkString("Array(", ", ", ")"))
-
-    val header = parquetFileDF.take(10)
-    println(header.mkString("Array(", ", ", ")"))
   }
 }
