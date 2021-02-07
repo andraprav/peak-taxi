@@ -1,9 +1,8 @@
 package com.peak.taxi
 
 import com.google.gson.Gson
-import com.peak.taxi.SparkUtils.initSpark
 import org.apache.spark.sql.functions.{count, desc}
-import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import org.apache.spark.sql.{DataFrame, Row}
 
 import java.io.PrintWriter
 
@@ -17,7 +16,6 @@ import java.io.PrintWriter
  *      - select all columns from files
  *      - filter them by trip_id (the list in group by)
  *      - write the results in a parquet file
- *  - optimize: rdd?
  */
 object Main {
 
@@ -25,12 +23,11 @@ object Main {
     val inputDirectory = args(0)
     val outputDirectory = args(1)
 
-    val spark = initSpark
 
     val processor = new Processor();
 
 
-    val taxiTripsDf = spark.time(processor.getTaxiTripsDataFrame(inputDirectory, spark))
+    val taxiTripsDf = SparkInstance.spark.time(processor.getTaxiTripsDataFrame(inputDirectory))
 
     val peakHourZoneId = taxiTripsDf
       .groupBy(processor.date_taxizone)
@@ -40,31 +37,32 @@ object Main {
       .get(0)
       .toString
 
-    writePeakHourToJson(peakHourZoneId, outputDirectory)
-    writeTripsToFiles(inputDirectory, outputDirectory, spark, processor, peakHourZoneId)
+    writeJson(peakHourZoneId, outputDirectory)
+    writeParquet(inputDirectory, outputDirectory, processor, peakHourZoneId)
 
-    spark.stop()
-
+    SparkInstance.spark.stop()
   }
 
-  private def writePeakHourToJson(peakHourZoneId: String, outputDirectory: String) = {
+  private def writeJson(peakHourZoneId: String, outputDirectory: String) = {
     new PrintWriter(outputDirectory + "/result.json") {
       private val details: Array[String] = peakHourZoneId.split(",")
       val peakHour = details(0)
       val zone = details(1)
+
       val peakHourJson = new PeakHour(peakHour, zone)
       val gson = new Gson
       val jsonString = gson.toJson(peakHourJson)
+
       write(jsonString)
       close()
     }
   }
 
-  private def writeTripsToFiles(inputDirectory: String, outputDirectory: String, spark: SparkSession, processor: Processor, peakHour: String) = {
-    spark.time({
+  private def writeParquet(inputDirectory: String, outputDirectory: String, processor: Processor, peakHour: String) = {
+    SparkInstance.spark.time({
 
       val tripsInPeakHour = processor
-        .getTaxiTripsAllFields(inputDirectory, spark)
+        .getTaxiTrips(inputDirectory)
         .filter(dropOffOrPickUpFilter(peakHour))
 
       tripsInPeakHour.write.parquet(outputDirectory)

@@ -1,36 +1,33 @@
 package com.peak.taxi
 
-import org.apache.spark.sql.{DataFrame, SparkSession, functions}
 import org.apache.spark.sql.functions.{col, date_format, lit}
+import org.apache.spark.sql.{DataFrame, functions}
 
 class Processor {
   val trip_id = "trip_id"
   val date_taxizone = "date_taxizone"
-
-  private val pickup_datetime = "pickup_datetime"
-  private val dropoff_datetime = "dropoff_datetime"
-
-  private val pickup_taxizone_id = "pickup_taxizone_id"
-  private val dropoff_taxizone_id = "dropoff_taxizone_id"
-
   val date = "date"
   val taxizone_id = "taxizone_id"
+  private val pickup_datetime = "pickup_datetime"
+  private val dropoff_datetime = "dropoff_datetime"
+  private val pickup_taxizone_id = "pickup_taxizone_id"
+  private val dropoff_taxizone_id = "dropoff_taxizone_id"
 
   /**
    *
    * @return a data frame containing 2 columns:
-   *  date_taxizone -> separated by comma
-   *  there are both pickups and dropoffs
-   *  the date is stripped by minute and seconds, format: yyyy-MM-dd HH
-   *  +----------------+-------+
-      |date_taxizone   |trip_id|
-      +----------------+-------+
-      |2009-01-25 01,79|5263   |
-      ............
+   *         date_taxizone -> separated by comma
+   *         there are both pickups and dropoffs
+   *         the date is stripped by minute and seconds, format: yyyy-MM-dd HH
+   *         +----------------+-------+
+   *         |date_taxizone   |trip_id|
+   *         +----------------+-------+
+   *         |2009-01-25 01,79|5263   |
+   *         ............
    */
-  def getTaxiTripsDataFrame(inputDirectory: String, spark: SparkSession) = {
+  def getTaxiTripsDataFrame(inputDirectory: String) = {
 
-    val taxiTrips = getTaxiTrips(inputDirectory, spark)
+    val taxiTrips = getTaxiTripsToProcess(inputDirectory)
 
     val pickups = renameColumns(taxiTrips, pickup_datetime, pickup_taxizone_id)
     val dropOffs = renameColumns(taxiTrips, dropoff_datetime, dropoff_taxizone_id)
@@ -45,24 +42,12 @@ class Processor {
       .withColumnRenamed(pickup_taxizone_id, taxizone_id)
   }
 
-  private def getTaxiTrips(inputDirectory: String, spark: SparkSession) = {
+  private def getTaxiTripsToProcess(inputDirectory: String) = {
     val dateFormat = "yyyy-MM-dd HH"
 
-    spark.read.load(inputDirectory ++ "/*")
+    SparkInstance.spark.read.load(inputDirectory ++ "/*")
       .select(pickup_datetime, pickup_taxizone_id, dropoff_datetime, dropoff_taxizone_id, trip_id)
       .filter(row => !row.anyNull)
-      .withColumn(dropoff_datetime, date_format(col(dropoff_datetime), dateFormat))
-      .withColumn(pickup_datetime, date_format(col(pickup_datetime), dateFormat))
-  }
-
-  def getTaxiTripsAllFields(inputDirectory: String, spark: SparkSession) = {
-    val dateFormat = "yyyy-MM-dd HH"
-
-    spark.read.load(inputDirectory ++ "/*")
-      .filter(row => row.getAs("dropoff_datetime") != null)
-      .filter(row => row.getAs("pickup_datetime") != null)
-      .filter(row => row.getAs("pickup_taxizone_id") != null)
-      .filter(row => row.getAs("dropoff_taxizone_id") != null)
       .withColumn(dropoff_datetime, date_format(col(dropoff_datetime), dateFormat))
       .withColumn(pickup_datetime, date_format(col(pickup_datetime), dateFormat))
   }
@@ -72,5 +57,17 @@ class Processor {
       col(date),
       lit(","),
       col(taxizone_id)).as(date_taxizone)
+  }
+
+  def getTaxiTrips(inputDirectory: String) = {
+    val dateFormat = "yyyy-MM-dd HH"
+
+    SparkInstance.spark.read.load(inputDirectory ++ "/*")
+      .filter(row => row.getAs("dropoff_datetime") != null)
+      .filter(row => row.getAs("pickup_datetime") != null)
+      .filter(row => row.getAs("pickup_taxizone_id") != null)
+      .filter(row => row.getAs("dropoff_taxizone_id") != null)
+      .withColumn(dropoff_datetime, date_format(col(dropoff_datetime), dateFormat))
+      .withColumn(pickup_datetime, date_format(col(pickup_datetime), dateFormat))
   }
 }
