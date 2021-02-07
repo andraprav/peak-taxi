@@ -6,11 +6,14 @@ object SparkInstance {
   val spark: SparkSession = initSpark
 
   def initSpark = {
-    SparkSession
+    val sparkSession = SparkSession
       .builder()
       .appName("PeakTaxi")
       .config("spark.master", "local[*]")
-      .getOrCreate()
+      .getOrCreate
+    sparkSession
+      .sparkContext.setLogLevel("WARN")
+    sparkSession
   }
 
   def stop(): Unit = {

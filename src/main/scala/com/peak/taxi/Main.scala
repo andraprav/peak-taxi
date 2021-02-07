@@ -6,11 +6,6 @@ import org.apache.spark.sql.{DataFrame, Row, SaveMode}
 
 import java.io.PrintWriter
 
-/**
- * todo:
- *  - decide how many cores to use
- *  - test with all files
- */
 object Main {
 
   def main(args: Array[String]): Unit = {
