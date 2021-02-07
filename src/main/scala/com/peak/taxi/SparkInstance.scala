@@ -9,7 +9,7 @@ object SparkInstance {
     SparkSession
       .builder()
       .appName("PeakTaxi")
-      .config("spark.master", "local[4]")
+      .config("spark.master", "local[*]")
       .getOrCreate()
   }
 

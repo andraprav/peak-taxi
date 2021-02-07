@@ -26,7 +26,7 @@ object Processor {
    *         |2009-01-25 01,79|5263   |
    *         ............
    */
-  def getTaxiTripsDataFrame(inputDirectory: String) = {
+  def getTaxiTripsDataFrame(inputDirectory: String): DataFrame = {
 
     val taxiTrips = getTaxiTripsToProcess(inputDirectory)
 
@@ -60,7 +60,7 @@ object Processor {
       col(taxizone_id)).as(date_taxizone)
   }
 
-  def getTaxiTrips(inputDirectory: String) = {
+  def getTaxiTrips(inputDirectory: String): DataFrame = {
     val dateFormat = "yyyy-MM-dd HH"
 
     SparkInstance.spark.read.load(inputDirectory ++ "/*")
