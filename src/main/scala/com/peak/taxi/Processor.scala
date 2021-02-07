@@ -55,6 +55,18 @@ class Processor {
       .withColumn(pickup_datetime, date_format(col(pickup_datetime), dateFormat))
   }
 
+  def getTaxiTripsAllFields(inputDirectory: String, spark: SparkSession) = {
+    val dateFormat = "yyyy-MM-dd HH"
+
+    spark.read.load(inputDirectory ++ "/*")
+      .filter(row => row.getAs("dropoff_datetime") != null)
+      .filter(row => row.getAs("pickup_datetime") != null)
+      .filter(row => row.getAs("pickup_taxizone_id") != null)
+      .filter(row => row.getAs("dropoff_taxizone_id") != null)
+      .withColumn(dropoff_datetime, date_format(col(dropoff_datetime), dateFormat))
+      .withColumn(pickup_datetime, date_format(col(pickup_datetime), dateFormat))
+  }
+
   private def dateTaxizoneColumn = {
     functions.concat(
       col(date),
