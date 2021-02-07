@@ -1,14 +1,17 @@
 package com.peak.taxi
 
+import com.google.gson.Gson
 import com.peak.taxi.SparkUtils.initSpark
 import org.apache.spark.sql.functions.{count, desc}
-import org.apache.spark.sql.{DataFrame, Row}
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+
+import java.io.PrintWriter
 
 /**
  * todo:
  *  - decide how many cores to choose
  *  - test with all files
- *  - write result value in json file
+ *    * write result value in json file
  *    * find way to get the parquet files back from processor.
  *    idea 1:
  *      - select all columns from files
@@ -29,7 +32,7 @@ object Main {
 
     val taxiTripsDf = spark.time(processor.getTaxiTripsDataFrame(inputDirectory, spark))
 
-    val peakHour = taxiTripsDf
+    val peakHourZoneId = taxiTripsDf
       .groupBy(processor.date_taxizone)
       .agg(count("trip_id") as "count")
       .orderBy(desc("count"))
@@ -37,6 +40,27 @@ object Main {
       .get(0)
       .toString
 
+    writePeakHourToJson(peakHourZoneId, outputDirectory)
+    writeTripsToFiles(inputDirectory, outputDirectory, spark, processor, peakHourZoneId)
+
+    spark.stop()
+
+  }
+
+  private def writePeakHourToJson(peakHourZoneId: String, outputDirectory: String) = {
+    new PrintWriter(outputDirectory + "/result.json") {
+      private val details: Array[String] = peakHourZoneId.split(",")
+      val peakHour = details(0)
+      val zone = details(1)
+      val peakHourJson = new PeakHour(peakHour, zone)
+      val gson = new Gson
+      val jsonString = gson.toJson(peakHourJson)
+      write(jsonString)
+      close()
+    }
+  }
+
+  private def writeTripsToFiles(inputDirectory: String, outputDirectory: String, spark: SparkSession, processor: Processor, peakHour: String) = {
     spark.time({
 
       val tripsInPeakHour = processor
@@ -46,9 +70,6 @@ object Main {
       tripsInPeakHour.write.parquet(outputDirectory)
 
     })
-
-
-    spark.stop()
   }
 
   private def dropOffOrPickUpFilter(peakHour: String) = {
