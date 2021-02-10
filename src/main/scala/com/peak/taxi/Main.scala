@@ -24,32 +24,28 @@ object Main {
 
   private def getPeakHour(taxiTripsDf: DataFrame) = {
     SparkInstance.spark.time({
-      taxiTripsDf
-        .groupBy(Processor.date_taxizone)
+      val peakTrips = taxiTripsDf
+        .groupBy(Processor.date, Processor.taxizone_id)
         .agg(count("trip_id") as "count")
         .orderBy(desc("count"))
-        .first()
-        .get(0)
-        .toString
+        .first
+      val date = peakTrips.get(0).toString
+      val taxizoneId = peakTrips.get(1).toString
+      PeakHour(date, taxizoneId)
     })
   }
 
-  private def writeJson(peakHourZoneId: String, outputDirectory: String) = {
+  private def writeJson(peakHourZoneId: PeakHour, outputDirectory: String) = {
     new PrintWriter(outputDirectory + "/result.json") {
-      private val details: Array[String] = peakHourZoneId.split(",")
-      val peakHour: String = details(0)
-      val zone: String = details(1)
-
-      val peakHourJson = new PeakHour(peakHour, zone)
       val gson = new Gson
-      val jsonString: String = gson.toJson(peakHourJson)
+      val jsonString: String = gson.toJson(peakHourZoneId)
 
       write(jsonString)
       close()
     }
   }
 
-  private def writeParquet(inputDirectory: String, outputDirectory: String, peakHour: String): Unit = {
+  private def writeParquet(inputDirectory: String, outputDirectory: String, peakHour: PeakHour): Unit = {
     SparkInstance.spark.time({
 
       val tripsInPeakHour = Processor
@@ -61,10 +57,15 @@ object Main {
     })
   }
 
-  private def dropOffOrPickUpFilter(peakHour: String) = {
+  private def dropOffOrPickUpFilter(peakHour: PeakHour) = {
     row: Row => {
-      val dropOff = row.getAs("dropoff_datetime").toString + "," + row.getAs("dropoff_taxizone_id").toString
-      val pickUp = row.getAs("pickup_datetime").toString + "," + row.getAs("pickup_taxizone_id").toString
+      val dropOffDate = row.getAs("dropoff_datetime").toString
+      val dropOffTaxiZoneId = row.getAs("dropoff_taxizone_id").toString
+      val dropOff = PeakHour(dropOffDate, dropOffTaxiZoneId)
+
+      val pickUpDate = row.getAs("pickup_datetime").toString
+      val pickUpTaxiZoneId = row.getAs("pickup_taxizone_id").toString
+      val pickUp = PeakHour(pickUpDate, pickUpTaxiZoneId)
 
       dropOff.equals(peakHour) || pickUp.equals(peakHour)
     }

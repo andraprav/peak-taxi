@@ -1,5 +1,5 @@
 package com.peak.taxi
 
-class PeakHour(val peakHour: String, val zoneId: String) {
+case class PeakHour(peakHour: String, zoneId: String) extends Serializable {
 
 }

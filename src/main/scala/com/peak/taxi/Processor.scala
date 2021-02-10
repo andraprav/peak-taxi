@@ -1,18 +1,20 @@
 package com.peak.taxi
 
-import org.apache.spark.sql.functions.{col, date_format, lit}
+import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.{DataFrame, functions}
 
+import java.sql.Timestamp
+import java.util.Calendar
+
 object Processor {
+  val date = "date"
+  val taxizone_id = "taxizone_id"
   private val trip_id = "trip_id"
-  private val date = "date"
-  private val taxizone_id = "taxizone_id"
   private val pickup_datetime = "pickup_datetime"
   private val dropoff_datetime = "dropoff_datetime"
   private val pickup_taxizone_id = "pickup_taxizone_id"
   private val dropoff_taxizone_id = "dropoff_taxizone_id"
-
-  val date_taxizone = "date_taxizone"
+  private val truncateDateUdf = functions.udf[Timestamp, Timestamp](truncateDate)
 
   /**
    *
@@ -33,8 +35,7 @@ object Processor {
     val pickups = renameColumns(taxiTrips, pickup_datetime, pickup_taxizone_id)
     val dropOffs = renameColumns(taxiTrips, dropoff_datetime, dropoff_taxizone_id)
 
-    val allTrips = pickups.union(dropOffs)
-    allTrips.select(dateTaxizoneColumn, col(trip_id))
+    pickups.union(dropOffs)
   }
 
   private def renameColumns(taxiTrips: DataFrame, pickup_datetime: String, pickup_taxizone_id: String) = {
@@ -44,20 +45,11 @@ object Processor {
   }
 
   private def getTaxiTripsToProcess(inputDirectory: String) = {
-    val dateFormat = "yyyy-MM-dd HH"
-
     SparkInstance.spark.read.load(inputDirectory ++ "/*")
       .select(pickup_datetime, pickup_taxizone_id, dropoff_datetime, dropoff_taxizone_id, trip_id)
       .filter(row => !row.anyNull)
-      .withColumn(dropoff_datetime, date_format(col(dropoff_datetime), dateFormat))
-      .withColumn(pickup_datetime, date_format(col(pickup_datetime), dateFormat))
-  }
-
-  private def dateTaxizoneColumn = {
-    functions.concat(
-      col(date),
-      lit(","),
-      col(taxizone_id)).as(date_taxizone)
+      .withColumn(dropoff_datetime, truncateDateUdf(col(dropoff_datetime)))
+      .withColumn(pickup_datetime, truncateDateUdf(col(pickup_datetime)))
   }
 
   def getTaxiTrips(inputDirectory: String): DataFrame = {
@@ -68,7 +60,16 @@ object Processor {
       .filter(row => row.getAs("pickup_datetime") != null)
       .filter(row => row.getAs("pickup_taxizone_id") != null)
       .filter(row => row.getAs("dropoff_taxizone_id") != null)
-      .withColumn(dropoff_datetime, date_format(col(dropoff_datetime), dateFormat))
-      .withColumn(pickup_datetime, date_format(col(pickup_datetime), dateFormat))
+      .withColumn(dropoff_datetime, truncateDateUdf(col(dropoff_datetime)))
+      .withColumn(pickup_datetime, truncateDateUdf(col(pickup_datetime)))
+  }
+
+  private def truncateDate(date: Timestamp) = {
+    val cal = Calendar.getInstance()
+    cal.setTime(date)
+    cal.set(Calendar.MINUTE, 0)
+    cal.set(Calendar.SECOND, 0)
+    cal.set(Calendar.MILLISECOND, 0)
+    Timestamp.from(cal.toInstant)
   }
 }
