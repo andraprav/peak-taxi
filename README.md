@@ -57,5 +57,5 @@ Determine the peak hour of taxi trips, using parquet files as input.
 ###Time
     run on a 6 cores CPU
     10 files:
-        processing result: 17s, scales liniarly
-        writing results: 17s, scales ~liniarly
+        processing result: 8s, scales liniarly
+        writing results: 12s, scales ~liniarly
